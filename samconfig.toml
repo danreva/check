@@ -1,0 +1,11 @@
+version=0.1
+[default.global.parameters]
+stack_name = "stage-dance-sam-app"
+
+[default.deploy.parameters]
+stack_name = "stage-dance-sam-app"
+s3_bucket = "stage-dance-sam-builds"
+region = "us-east-1"
+confirm_changeset = true
+capabilities = "CAPABILITY_IAM"
+tags = "project=\"stage-dance\" stage=\"production\""

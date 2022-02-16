@@ -1,0 +1,122 @@
+AWSTemplateFormatVersion: 2010-09-09
+Transform: "AWS::Serverless-2016-10-31"
+Description: >-
+  stage-dance-sam-app
+
+Parameters:
+  Stage:
+    Type: String
+    AllowedValues:
+      - dev
+      - staging
+      - prod
+    Description: Enter dev, sat, demo, staging or prod
+
+Globals:
+  Function:
+    Runtime: nodejs14.x
+    Tracing: Active
+    Architectures:
+      - x86_64
+
+Resources:
+  StageDanceAPI:
+    Type: AWS::Serverless::Api
+    Properties:
+      StageName: !Ref Stage
+      Cors:
+        AllowMethods: "'POST, GET, OPTIONS'"
+        AllowOrigin: "'*'"
+        AllowHeaders: "'Content-Type,x-requested-with,Access-Control-Allow-Origin,Access-Control-Allow-Headers,Access-Control-Allow-Methods'"
+        AllowCredentials: False
+      Name: stage-dance-api
+      TracingEnabled: True
+
+  # DynamoDB Table:  Starts Here
+  Teachers:
+    Type: AWS::Serverless::SimpleTable
+    Properties:
+      PrimaryKey:
+        Name: id
+        Type: String
+      ProvisionedThroughput:
+        ReadCapacityUnits: 5
+        WriteCapacityUnits: 5
+
+  Files:
+    Type: AWS::Serverless::SimpleTable
+    Properties:
+      PrimaryKey:
+        Name: id
+        Type: String
+      ProvisionedThroughput:
+        ReadCapacityUnits: 5
+        WriteCapacityUnits: 5
+  # DynamoDB Table:  Ends Here
+
+  # User Pools: Starts Here
+  AdminUserPool:
+    Type: AWS::Cognito::UserPool
+    Properties:
+      AdminCreateUserConfig:
+        AllowAdminCreateUserOnly: false
+      UserPoolName: Admin Users
+      UsernameAttributes:
+        - email
+      AutoVerifiedAttributes:
+        - email
+      Policies:
+        PasswordPolicy:
+          MinimumLength: 6
+          RequireLowercase: true
+          RequireNumbers: false
+          RequireSymbols: false
+          RequireUppercase: true
+  # User Pools: Ends Here
+
+  # S3 Buckets: Starts Here
+  MediaSourceBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: "media-source-bucket"
+  MediaHLSBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: "media-hls-bucket"
+  # S3 Buckets: Ends Here
+
+  # Lambda Handlers: Starts Here
+  signUpFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: src/handlers/api.sign_up
+      Events:
+        SyncRESTEvent:
+          Type: Api
+          Properties:
+            Path: /signup
+            Method: POST
+            RestApiId: !Ref StageDanceAPI
+      Policies:
+        - AWSLambdaBasicExecutionRole
+
+  getS3SignedURLFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Timeout: 160
+      Handler: src/handlers/api.getS3SignedURL
+      Events:
+        SyncRESTEvent:
+          Type: Api
+          Properties:
+            Path: /signed-url
+            Method: POST
+            RestApiId: !Ref StageDanceAPI
+      Policies:
+        - AWSLambdaBasicExecutionRole
+  # Lambda Handlers: Ends Here
+
+Outputs:
+  WebEndpoint:
+    Description: "Stage Dance API"
+    Value: !Sub "https://${StageDanceAPI}.execute-api.${AWS::Region}.amazonaws.com/${Stage}/"
